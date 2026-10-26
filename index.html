@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>American Express – Analytics Dashboard</title>
+  <meta name="description" content="Interactive analytics dashboard for American Express spending patterns, customer segments and churn risk." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #07080f;
+      --surface:   #0e1120;
+      --surface2:  #151828;
+      --border:    rgba(255,255,255,0.07);
+      --accent:    #2563ff;
+      --accent2:   #7c3aed;
+      --gold:      #f59e0b;
+      --green:     #10b981;
+      --red:       #ef4444;
+      --cyan:      #06b6d4;
+      --text:      #f1f5f9;
+      --muted:     #64748b;
+      --card-r:    16px;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Background blobs ─────────────────────────────────────────── */
+    .bg-blobs {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      overflow: hidden;
+    }
+    .blob {
+      position: absolute; border-radius: 50%;
+      filter: blur(120px); opacity: 0.12;
+    }
+    .blob-1 { width: 600px; height: 600px; background: var(--accent);  top: -200px; left: -200px; }
+    .blob-2 { width: 500px; height: 500px; background: var(--accent2); bottom: -100px; right: -100px; }
+    .blob-3 { width: 300px; height: 300px; background: var(--gold);    top: 40%; left: 55%; }
+
+    /* ── Layout ───────────────────────────────────────────────────── */
+    .wrapper { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 0 24px 60px; }
+
+    /* ── Header ───────────────────────────────────────────────────── */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 28px 0 36px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 36px;
+    }
+    .logo { display: flex; align-items: center; gap: 14px; }
+    .logo-icon {
+      width: 46px; height: 46px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: grid; place-items: center; font-size: 22px;
+      box-shadow: 0 0 24px rgba(37,99,255,0.4);
+    }
+    .logo-text h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; }
+    .logo-text p  { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+    .header-badge {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 18px; border-radius: 100px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      font-size: 0.8rem; color: var(--muted);
+    }
+    .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.3)} }
+
+    /* ── KPI Cards ────────────────────────────────────────────────── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 16px; margin-bottom: 28px;
+    }
+    .kpi {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--card-r);
+      padding: 22px 20px;
+      position: relative; overflow: hidden;
+      transition: transform .25s, box-shadow .25s;
+      cursor: default;
+    }
+    .kpi:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(0,0,0,0.4); }
+    .kpi::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      border-radius: var(--card-r) var(--card-r) 0 0;
+    }
+    .kpi.blue::before   { background: linear-gradient(90deg, var(--accent), var(--cyan)); }
+    .kpi.purple::before { background: linear-gradient(90deg, var(--accent2), #ec4899); }
+    .kpi.gold::before   { background: linear-gradient(90deg, var(--gold), #f97316); }
+    .kpi.green::before  { background: linear-gradient(90deg, var(--green), #34d399); }
+    .kpi.red::before    { background: linear-gradient(90deg, var(--red), #f97316); }
+    .kpi.cyan::before   { background: linear-gradient(90deg, var(--cyan), var(--accent)); }
+
+    .kpi-icon { font-size: 1.6rem; margin-bottom: 10px; }
+    .kpi-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+    .kpi-value { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.03em; }
+    .kpi-sub   { font-size: 0.72rem; color: var(--muted); margin-top: 4px; }
+
+    /* ── Section title ────────────────────────────────────────────── */
+    .section-title {
+      font-size: 0.75rem; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.1em;
+      margin: 36px 0 16px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .section-title::after { content:''; flex:1; height:1px; background: var(--border); }
+
+    /* ── Card ─────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--card-r);
+      padding: 24px;
+      transition: box-shadow .25s;
+    }
+    .card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.35); }
+    .card-title { font-size: 0.95rem; font-weight: 600; margin-bottom: 20px; color: var(--text); }
+
+    /* ── Chart grids ──────────────────────────────────────────────── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+    @media(max-width: 900px) { .grid-2,.grid-3 { grid-template-columns: 1fr; } }
+
+    canvas { max-height: 280px; }
+
+    /* ── Charts gallery ───────────────────────────────────────────── */
+    .charts-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px,1fr)); gap: 20px; }
+    .chart-img-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--card-r); overflow:hidden; transition: transform .25s, box-shadow .25s; }
+    .chart-img-card:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(0,0,0,0.5); }
+    .chart-img-card img { width:100%; display:block; background: #fff; }
+    .chart-img-card .caption { padding: 12px 16px; font-size: 0.8rem; color: var(--muted); }
+
+    /* ── RFM table ────────────────────────────────────────────────── */
+    .rfm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 14px; }
+    .seg-card {
+      border-radius: 12px; padding: 18px 16px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      transition: transform .2s;
+    }
+    .seg-card:hover { transform: scale(1.03); }
+    .seg-name  { font-size: 0.85rem; font-weight: 700; margin-bottom: 12px; }
+    .seg-stat  { display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px; }
+    .seg-key   { font-size: 0.7rem; color: var(--muted); }
+    .seg-val   { font-size: 0.82rem; font-weight: 600; }
+    .seg-bar   { height: 4px; border-radius: 2px; background: rgba(255,255,255,0.08); margin-top: 10px; }
+    .seg-bar-fill { height: 100%; border-radius: 2px; transition: width .8s ease; }
+
+    /* ── Model table ──────────────────────────────────────────────── */
+    .model-table { width: 100%; border-collapse: collapse; }
+    .model-table th { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; padding: 10px 14px; text-align:left; border-bottom: 1px solid var(--border); }
+    .model-table td { padding: 14px 14px; font-size: 0.88rem; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .model-table tr:hover td { background: rgba(255,255,255,0.02); }
+    .badge { display:inline-block; padding: 3px 10px; border-radius: 100px; font-size: 0.72rem; font-weight: 600; }
+    .badge-blue { background: rgba(37,99,255,0.2); color: #93c5fd; }
+    .badge-gold { background: rgba(245,158,11,0.2); color: #fcd34d; }
+    .auc-bar { display:inline-block; height:6px; border-radius:3px; background: var(--accent); vertical-align:middle; margin-left:8px; }
+
+    /* ── Loader ───────────────────────────────────────────────────── */
+    #loader {
+      position: fixed; inset:0; background: var(--bg); z-index:999;
+      display:grid; place-items:center;
+      transition: opacity .5s;
+    }
+    .spinner { width:44px; height:44px; border: 3px solid rgba(255,255,255,0.1); border-top-color: var(--accent); border-radius:50%; animation: spin .8s linear infinite; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+
+    /* ── Scroll reveal ────────────────────────────────────────────── */
+    .reveal { opacity:0; transform:translateY(24px); transition: opacity .6s ease, transform .6s ease; }
+    .reveal.visible { opacity:1; transform:none; }
+  </style>
+</head>
+<body>
+
+<div id="loader"><div class="spinner"></div></div>
+
+<div class="bg-blobs">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+</div>
+
+<div class="wrapper">
+
+  <!-- Header -->
+  <header class="reveal">
+    <div class="logo">
+      <div class="logo-icon">💳</div>
+      <div class="logo-text">
+        <h1>American Express Analytics</h1>
+        <p>Spending Patterns · Customer Segments · Churn Risk</p>
+      </div>
+    </div>
+    <div class="header-badge">
+      <span class="live-dot"></span>
+      5,000 Cardmembers · 5.46L Transactions
+    </div>
+  </header>
+
+  <!-- KPI Cards -->
+  <div class="kpi-grid reveal">
+    <div class="kpi blue">
+      <div class="kpi-icon">💰</div>
+      <div class="kpi-label">Total Spend</div>
+      <div class="kpi-value" id="kpi-spend">—</div>
+      <div class="kpi-sub">Jan 2025 – Jun 2026</div>
+    </div>
+    <div class="kpi purple">
+      <div class="kpi-icon">🔄</div>
+      <div class="kpi-label">Transactions</div>
+      <div class="kpi-value" id="kpi-txns">—</div>
+      <div class="kpi-sub">18 months total</div>
+    </div>
+    <div class="kpi gold">
+      <div class="kpi-icon">🏆</div>
+      <div class="kpi-label">Champions</div>
+      <div class="kpi-value" id="kpi-champ">—</div>
+      <div class="kpi-sub">43.5% of all spend</div>
+    </div>
+    <div class="kpi red">
+      <div class="kpi-icon">⚠️</div>
+      <div class="kpi-label">At-Risk Customers</div>
+      <div class="kpi-value" id="kpi-atrisk">—</div>
+      <div class="kpi-sub">₹20Cr revenue at risk</div>
+    </div>
+    <div class="kpi green">
+      <div class="kpi-icon">📉</div>
+      <div class="kpi-label">Churn Rate</div>
+      <div class="kpi-value" id="kpi-churn">10.8%</div>
+      <div class="kpi-sub">Best model AUC 0.907</div>
+    </div>
+    <div class="kpi cyan">
+      <div class="kpi-icon">🌆</div>
+      <div class="kpi-label">Total Customers</div>
+      <div class="kpi-value">5,000</div>
+      <div class="kpi-sub">Across 4 card tiers</div>
+    </div>
+  </div>
+
+  <!-- Monthly Trend + Category Donut -->
+  <div class="section-title reveal">📈 Spend Trends</div>
+  <div class="grid-2 reveal">
+    <div class="card">
+      <div class="card-title">Monthly Spend (₹ Crore)</div>
+      <canvas id="monthlyChart"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Spend by Category</div>
+      <canvas id="categoryChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Card Tier Comparison -->
+  <div class="section-title reveal">💳 Card Tier Analysis</div>
+  <div class="grid-2 reveal">
+    <div class="card">
+      <div class="card-title">Spend per Customer by Tier (₹)</div>
+      <canvas id="tierSpendChart"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Avg Transaction Ticket by Tier (₹)</div>
+      <canvas id="tierTicketChart"></canvas>
+    </div>
+  </div>
+
+  <!-- RFM Segments -->
+  <div class="section-title reveal">👥 RFM Customer Segments</div>
+  <div class="rfm-grid reveal" id="rfmGrid"></div>
+
+  <!-- Churn Model -->
+  <div class="section-title reveal">🤖 Churn Prediction Models</div>
+  <div class="grid-2 reveal">
+    <div class="card">
+      <div class="card-title">Model Performance Comparison</div>
+      <canvas id="modelChart"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Model Leaderboard</div>
+      <table class="model-table" id="modelTable"></table>
+    </div>
+  </div>
+
+  <!-- Analytics Charts Gallery -->
+  <div class="section-title reveal">📊 Analysis Charts</div>
+  <div class="charts-gallery reveal" id="chartsGallery"></div>
+
+</div>
+
+<script>
+// ── Utilities ──────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const fmt = (n, dec=0) => Number(n).toLocaleString('en-IN', {maximumFractionDigits: dec});
+
+function chartDefaults() {
+  Chart.defaults.color = '#64748b';
+  Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+  Chart.defaults.font.family = 'Inter';
+}
+
+// ── Loader ─────────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  const loader = $('loader');
+  setTimeout(() => { loader.style.opacity = '0'; setTimeout(()=>loader.remove(),500); }, 600);
+});
+
+// ── Scroll reveal ──────────────────────────────────────────────────────────
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if(e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } });
+}, { threshold: 0.08 });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// ── Chart helpers ──────────────────────────────────────────────────────────
+const PALETTE = ['#2563ff','#7c3aed','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#f97316'];
+const mkGrad = (ctx, top, bot) => { const g=ctx.createLinearGradient(0,0,0,280); g.addColorStop(0,top); g.addColorStop(1,bot); return g; };
+
+// ── Fetch & Render ─────────────────────────────────────────────────────────
+async function init() {
+  chartDefaults();
+  const [summary, monthly, cats, tiers, rfm, models] = await Promise.all([
+    fetch('/api/summary').then(r=>r.json()),
+    fetch('/api/monthly').then(r=>r.json()),
+    fetch('/api/categories').then(r=>r.json()),
+    fetch('/api/card-tiers').then(r=>r.json()),
+    fetch('/api/rfm-segments').then(r=>r.json()),
+    fetch('/api/churn-models').then(r=>r.json()),
+  ]);
+
+  // KPIs
+  $('kpi-spend').textContent  = '₹' + fmt(summary.total_spend_crore,1) + ' Cr';
+  $('kpi-txns').textContent   = fmt(summary.total_txns);
+  $('kpi-champ').textContent  = fmt(summary.champions_count);
+  $('kpi-atrisk').textContent = fmt(summary.at_risk_count);
+
+  // ── Monthly Chart
+  const mCtx = $('monthlyChart').getContext('2d');
+  new Chart(mCtx, {
+    type: 'line',
+    data: {
+      labels: monthly.map(r => r.month.slice(2)),
+      datasets: [{
+        label: 'Spend (₹Cr)',
+        data: monthly.map(r => parseFloat(r.spend_crore)),
+        borderColor: '#2563ff',
+        backgroundColor: mkGrad(mCtx, 'rgba(37,99,255,0.25)', 'rgba(37,99,255,0)'),
+        fill: true, tension: 0.4, pointRadius: 4, pointHoverRadius: 6,
+        pointBackgroundColor: '#2563ff', borderWidth: 2.5,
+      }]
+    },
+    options: { plugins:{ legend:{display:false} }, scales:{ x:{grid:{display:false}}, y:{grid:{color:'rgba(255,255,255,0.05)'}} }, animation:{duration:1200} }
+  });
+
+  // ── Category Donut
+  new Chart($('categoryChart').getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels: cats.map(r => r.category),
+      datasets: [{ data: cats.map(r=>parseFloat(r.spend_crore)), backgroundColor: PALETTE, borderColor:'transparent', borderWidth:0, hoverOffset:8 }]
+    },
+    options: {
+      cutout: '65%',
+      plugins: { legend:{ position:'right', labels:{ boxWidth:10, padding:14, font:{size:11} } } },
+      animation: { duration:1200 }
+    }
+  });
+
+  // ── Tier Spend Chart
+  const tierLabels = tiers.map(r=>r.card_type);
+  const tierColors = ['#f59e0b','#9ca3af','#f97316','#10b981'];
+  new Chart($('tierSpendChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: tierLabels,
+      datasets: [{ label:'Spend/Customer (₹)', data: tiers.map(r=>parseFloat(r.spend_per_customer)), backgroundColor: tierColors, borderRadius: 8, borderSkipped:false }]
+    },
+    options: { plugins:{legend:{display:false}}, scales:{ x:{grid:{display:false}}, y:{grid:{color:'rgba(255,255,255,0.05)'}} }, animation:{duration:1000} }
+  });
+
+  // ── Tier Ticket Chart
+  new Chart($('tierTicketChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: tierLabels,
+      datasets: [{ label:'Avg Ticket (₹)', data: tiers.map(r=>parseFloat(r.avg_ticket)), backgroundColor: tierColors.map(c=>c+'88'), borderColor: tierColors, borderWidth: 2, borderRadius: 8, borderSkipped:false }]
+    },
+    options: { plugins:{legend:{display:false}}, scales:{ x:{grid:{display:false}}, y:{grid:{color:'rgba(255,255,255,0.05)'}} }, animation:{duration:1000} }
+  });
+
+  // ── RFM Segment Cards
+  const segColors = { 'Champions':'#f59e0b', 'At Risk':'#ef4444', 'Loyal':'#10b981', 'Need Attention':'#06b6d4', 'New / Promising':'#2563ff', 'Hibernating':'#6b7280' };
+  const maxSpend = Math.max(...rfm.map(r=>parseFloat(r.avg_spend)));
+  const rfmGrid = $('rfmGrid');
+  rfm.forEach(r => {
+    const pct = (parseFloat(r.avg_spend)/maxSpend*100).toFixed(0);
+    const color = segColors[r.segment] || '#7c3aed';
+    rfmGrid.innerHTML += `
+      <div class="seg-card" style="border-color:${color}30">
+        <div class="seg-name" style="color:${color}">${r.segment}</div>
+        <div class="seg-stat"><span class="seg-key">Customers</span><span class="seg-val">${fmt(r.customers)}</span></div>
+        <div class="seg-stat"><span class="seg-key">Avg Spend</span><span class="seg-val">₹${fmt(r.avg_spend)}</span></div>
+        <div class="seg-stat"><span class="seg-key">Avg Frequency</span><span class="seg-val">${r.avg_frequency} txns</span></div>
+        <div class="seg-stat"><span class="seg-key">Spend Share</span><span class="seg-val">${r.spend_share_pct}%</span></div>
+        <div class="seg-bar"><div class="seg-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+      </div>`;
+  });
+
+  // ── Model Chart
+  const modelLabels = models.map(r=>r[''] || r.model || Object.values(r)[0]);
+  new Chart($('modelChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: modelLabels,
+      datasets: [
+        { label:'CV ROC-AUC',   data: models.map(r=>parseFloat(r.cv_auc)),   backgroundColor:'rgba(37,99,255,0.7)',  borderRadius:6, borderSkipped:false },
+        { label:'Test ROC-AUC', data: models.map(r=>parseFloat(r.test_auc)), backgroundColor:'rgba(124,58,237,0.7)', borderRadius:6, borderSkipped:false },
+      ]
+    },
+    options: {
+      plugins:{ legend:{ labels:{boxWidth:12, font:{size:11}} } },
+      scales:{ x:{grid:{display:false}}, y:{min:0.85, max:0.92, grid:{color:'rgba(255,255,255,0.05)'}} },
+      animation:{duration:1000}
+    }
+  });
+
+  // ── Model Table
+  const tbl = $('modelTable');
+  tbl.innerHTML = `<thead><tr><th>Model</th><th>CV AUC</th><th>Test AUC</th><th>Status</th></tr></thead><tbody>` +
+    models.map((r,i)=>{
+      const name = r[''] || r.model || Object.values(r)[0];
+      const cv   = parseFloat(r.cv_auc);
+      const test = parseFloat(r.test_auc);
+      const best = i===0;
+      const bar  = `<span class="auc-bar" style="width:${(cv-0.85)*1000}px"></span>`;
+      return `<tr><td style="font-weight:600">${name}</td><td>${cv.toFixed(3)}${bar}</td><td>${test.toFixed(3)}</td><td><span class="badge ${best?'badge-gold':'badge-blue'}">${best?'⭐ Best':'Good'}</span></td></tr>`;
+    }).join('') + '</tbody>';
+
+  // ── Charts Gallery
+  const chartFiles = [
+    {file:'01_monthly_spend.png',   title:'Monthly Spend Trend'},
+    {file:'02_category_spend.png',  title:'Category Spend Breakdown'},
+    {file:'03_card_tier.png',       title:'Card Tier Analysis'},
+    {file:'04_seasonality_heatmap.png', title:'Seasonality Heatmap'},
+    {file:'05_rfm_segments.png',    title:'RFM Customer Segments'},
+    {file:'06_model_performance.png', title:'Model Performance (ROC Curves)'},
+    {file:'07_feature_importance.png',title:'Churn Feature Importance'},
+  ];
+  const gallery = $('chartsGallery');
+  chartFiles.forEach(c => {
+    gallery.innerHTML += `
+      <div class="chart-img-card">
+        <img src="/charts/${c.file}" alt="${c.title}" loading="lazy" />
+        <div class="caption">📊 ${c.title}</div>
+      </div>`;
+  });
+}
+
+init();
+</script>
+</body>
+</html>

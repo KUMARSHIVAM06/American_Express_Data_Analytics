@@ -1,0 +1,11 @@
+customer_id,card_type,city,total_spend,spend_rank
+C02747,Centurion,Ahmedabad,7165675.0,1
+C04489,Platinum,Delhi,6976554.0,2
+C04997,Centurion,Bengaluru,6365517.0,3
+C04842,Centurion,Kolkata,6044519.0,4
+C04109,Platinum,Delhi,5469879.0,5
+C03660,Platinum,Mumbai,5267556.0,6
+C01776,Platinum,Pune,5200916.0,7
+C00397,Gold,Chennai,5006523.0,8
+C02332,Centurion,Pune,4957583.0,9
+C02751,Platinum,Kolkata,4841321.0,10

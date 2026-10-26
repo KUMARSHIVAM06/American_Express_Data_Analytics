@@ -1,0 +1,7 @@
+segment,customers,avg_recency,avg_frequency,avg_spend,spend_share_pct
+Champions,1000,1.0,185.0,817662.0,43.5
+At Risk,772,19.0,104.0,411251.0,16.9
+Loyal,1228,3.0,100.0,380929.0,24.9
+Need Attention,358,5.0,41.0,163454.0,3.1
+New / Promising,414,1.0,42.0,152129.0,3.3
+Hibernating,1228,27.0,35.0,128053.0,8.4

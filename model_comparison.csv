@@ -1,0 +1,4 @@
+,cv_auc,test_auc
+Logistic Regression,0.907,0.884
+Random Forest,0.904,0.891
+Gradient Boosting,0.906,0.89
